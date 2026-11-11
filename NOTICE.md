@@ -19,4 +19,6 @@ The cores were taken from a RetroArch PSP build. Source code for each is availab
 
 I am not a lawyer; this table is a pointer, not legal advice.
 
+`src/at3.js` is original code implementing the ATRAC3 bitstream. Its filter-bank constants and window shape are format constants that are identical to those used by FFmpeg's ATRAC3 decoder (LGPL-2.1+), against which it was verified; no FFmpeg code is included. ATRAC is a Sony technology; this project is not affiliated with Sony.
+
 Note: `tools/corefix.py` modifies the cores' startup code (runs `.init_array`) at build time. The shipped assets are unmodified upstream binaries.

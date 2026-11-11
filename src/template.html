@@ -21,6 +21,9 @@ p.lead{font-size:1.1rem;color:var(--mut);max-width:60ch;margin:0 0 24px}
 .game{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin:12px 0}
 .prev{display:flex;gap:10px;align-items:center}.prev canvas{border-radius:8px;display:block;background:#000}
 .prev .ic{width:144px;height:80px}.prev .bg{width:142px;height:80px}
+[hidden]{display:none!important}
+.slots{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.sl{display:inline-flex;gap:2px}.sl .x{padding:7px 9px}
+.snd{margin-top:8px;font-size:.85rem;color:var(--mut);display:flex;flex-wrap:wrap;gap:8px;align-items:center}.snd input{width:4.6em;font:inherit;padding:3px 6px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--ink)}
 .game input[type=text]{width:100%;font:600 1rem "IBM Plex Sans",sans-serif;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink)}
 .meta{font-size:.85rem;color:var(--mut);margin-top:4px}.btns{display:flex;flex-direction:column;gap:6px}
 button,.lbl{font:600 .9rem "IBM Plex Sans",sans-serif;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:7px 12px;cursor:pointer;text-align:center}
@@ -34,7 +37,7 @@ ol.steps{padding-left:22px}ol.steps li{margin:8px 0;max-width:68ch}
 @media(max-width:640px){.game{grid-template-columns:1fr}.prev{justify-content:center}.btns{flex-direction:row}}
 </style></head><body><main>
 <h1>Drop a ROM.<br>Get a PSP icon.</h1>
-<p class="lead">Each game becomes its own app on the PSP Memory Stick menu, with its own icon and background, and starts straight into the game. No RetroArch menus.</p>
+<p class="lead">Each game becomes its own app on the PSP Memory Stick menu, with its own icon, background picture and menu sound, and starts straight into the game. No RetroArch menus.</p>
 <label id="drop" tabindex="-1"><input id="file" type="file" multiple hidden accept=".gba,.sfc,.smc,.swc,.fig,.nes,.gb,.gbc,.md,.gen,.smd,.sms,.gg,.pce,.bin,.zip,.z64,.n64,.v64,.iso,.cue,.chd"><b>Drop ROMs here or click to choose</b><span>Several at once is fine. Files never leave your device.</span></label>
 <ul class="sys" aria-label="Supported systems"></ul>
 <p id="msg" role="status" aria-live="polite"></p>
@@ -45,7 +48,7 @@ ol.steps{padding-left:22px}ol.steps li{margin:8px 0;max-width:68ch}
 <ol class="steps">
 <li>Connect the PSP to your computer. On the PSP choose Settings, USB Connection, or take the Memory Stick out and use a card reader.</li>
 <li>Unzip the download. Copy the <b>GAME</b> folder contents (the game folders) into <b>PSP/GAME</b> on the Memory Stick. If it asks, merge.</li>
-<li>Unplug, then open Game, Memory Stick on the XMB. Each game has its own icon.</li>
+<li>Unplug, then open Game, Memory Stick on the XMB. Each game has its own icon and background, and its sound plays while it is highlighted.</li>
 <li>Start with one game to check it works before copying lots. If something is missing, the PSP shows which file it could not find.</li>
 <li>Press HOME to quit back to the XMB. Saves are written to <b>PSP/RETROARCH</b> on the stick, and every game gets its own file.</li>
 </ol>
@@ -74,20 +77,59 @@ function card(g,w,h){const c=cv(w,h),x=c.getContext('2d'),H=SYS[g.sys].hue,gr=x.
 const load=(src)=>new Promise((res,rej)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>res(i);i.onerror=rej;i.src=src});
 async function thumb(g,kind){try{const n=g.file.replace(/\.[^.]+$/,'').replace(/[&*\/:`<>?\\|]/g,'_');
  return await Promise.race([load('https://raw.githubusercontent.com/libretro-thumbnails/'+SYS[g.sys].repo+'/master/'+kind+'/'+encodeURIComponent(n)+'.png'),new Promise((_,r)=>setTimeout(r,5000))])}catch(e){return null}}
-async function art(g){let ic=null,pc=null;
- if(g.custom){ic=onbg(g.custom,144,80,.96);pc=onbg(g.custom,480,272,1)}
- else{const t=await thumb(g,'Named_Titles'),s=await thumb(g,'Named_Snaps');g.real=!!(t||s);
-  ic=t?onbg(t,144,80,.96):card(g,144,80);pc=(s||t)?onbg(s||t,480,272,1):card(g,480,272)}
- g.ic=ic;g.pc=pc;g.row.querySelector('.ic').getContext('2d').drawImage(ic,0,0);const b=g.row.querySelector('.bg').getContext('2d');b.clearRect(0,0,142,80);b.drawImage(pc,0,0,142,80)}
+const MAXSEC=28.9, ICON=[144,80], BG=[480,272];
+const fmtT=(t)=>Math.floor(t/60)+':'+String(Math.floor(t%60)).padStart(2,'0');
+// exact fill when the picture already has the right shape, otherwise centred over a blurred copy of itself
+function fit(im,w,h){if(Math.abs((im.width/im.height)/(w/h)-1)<.04){const c=cv(w,h);c.getContext('2d').drawImage(im,0,0,w,h);return c}return onbg(im,w,h,1)}
+async function art(g){
+ if(!g.fetched&&!(g.cIcon&&g.cBg)){g.fetched=1;g.t=await thumb(g,'Named_Titles');g.s=await thumb(g,'Named_Snaps');g.real=!!(g.t||g.s)}
+ const t=g.t,s=g.s;
+ g.ic=g.cIcon?fit(g.cIcon,...ICON):t?onbg(t,144,80,.96):card(g,144,80);
+ g.pc=g.cBg?fit(g.cBg,...BG):(s||t)?onbg(s||t,480,272,1):card(g,480,272);
+ g.row.querySelector('.ic').getContext('2d').drawImage(g.ic,0,0);const b=g.row.querySelector('.bg').getContext('2d');b.clearRect(0,0,142,80);b.drawImage(g.pc,0,0,142,80)}
+function sndInfo(g){const r=g.row,box=r.querySelector('.snd'),has=!!(g.at3||g.pcm);box.hidden=!has;r.querySelector('[data-k=snd]').closest('.sl').querySelector('.x').hidden=!has;if(!has)return;
+ const st=r.querySelector('.st'),info=r.querySelector('.sinfo'),pv=r.querySelector('.pv');r.querySelector('.sname').textContent=g.sndName;
+ if(g.at3){st.parentNode.hidden=true;pv.hidden=true;info.textContent='AT3 file used as it is';return}
+ st.parentNode.hidden=false;pv.hidden=false;const start=Math.max(0,+st.value||0),len=Math.min(MAXSEC,g.dur-start);
+ info.textContent=len>0.1?'plays '+fmtT(start)+' to '+fmtT(start+len)+(g.dur-start>MAXSEC?' (the PSP menu sound is limited to about 29 s)':''):'start is past the end of the clip'}
+function stopPrev(g){if(g.audio){g.audio.pause();g.audio=null}g.row.querySelector('.pv').textContent='Play'}
+async function setSnd(g,f){say('Reading '+f.name+'…',1);stopPrev(g);
+ try{const ab=await f.arrayBuffer();
+  if(/\.at3$/i.test(f.name)){const b=new Uint8Array(ab);if(b.length>500000)throw new Error('that .at3 is over 500 KB, the PSP will not play it');
+   const dv=new DataView(ab);if(b.length<44||String.fromCharCode(...b.subarray(0,4))!=='RIFF'||dv.getUint16(20,true)!==0x270&&dv.getUint16(20,true)!==0xFFFE)throw new Error('that is not an ATRAC3 .at3 file');
+   g.at3=b;g.pcm=null}
+  else{const C=window.OfflineAudioContext||window.webkitOfflineAudioContext,buf=await new C(2,1,44100).decodeAudioData(ab);
+   g.pcm=[buf.getChannelData(0),buf.getChannelData(buf.numberOfChannels>1?1:0)];g.dur=buf.duration;g.at3=null;g.sndFile=f;g.row.querySelector('.st').value=0}
+  g.sndName=f.name;sndInfo(g);say('')}
+ catch(e){say('Could not use that sound: '+(e&&e.message&&e.message!=='Unable to decode audio data'?e.message:'this browser cannot read that audio file. Try an MP3, WAV, OGG or M4A.'))}}
+function clearSnd(g){stopPrev(g);g.at3=g.pcm=g.sndFile=null;sndInfo(g)}
+function playPrev(g){const pv=g.row.querySelector('.pv');if(g.audio){stopPrev(g);return}
+ const a=new Audio(URL.createObjectURL(g.sndFile)),st=Math.max(0,+g.row.querySelector('.st').value||0);g.audio=a;pv.textContent='Stop';
+ a.onloadedmetadata=()=>{a.currentTime=st;a.play().catch(()=>stopPrev(g))};a.ontimeupdate=()=>{if(a.currentTime>st+MAXSEC)stopPrev(g)};a.onended=()=>stopPrev(g)}
+function encodeSnd(g){const sr=44100,a=Math.floor((+g.row.querySelector('.st').value||0)*sr),n=Math.min(g.pcm[0].length-a,Math.floor(MAXSEC*sr));
+ if(n<sr/10)throw new Error('The sound for "'+g.title+'" starts past the end of the clip');
+ const L=Float32Array.from(g.pcm[0].subarray(a,a+n)),R=Float32Array.from(g.pcm[1].subarray(a,a+n));
+ let pk=0;for(let i=0;i<n;i++)pk=Math.max(pk,Math.abs(L[i]),Math.abs(R[i]));const k=pk>0?.9/pk:1,fi=Math.min(220,n>>1),fo=Math.min(Math.floor(.3*sr),n>>1);
+ for(let i=0;i<n;i++){let m=k;if(i<fi)m*=i/fi;if(i>=n-fo)m*=(n-1-i)/fo;L[i]*=m;R[i]*=m}
+ return AT3.encode(L,R)}
 function add(f){const ext=f.name.split('.').pop().toLowerCase();
  if(!EXT[ext]){say('Not added: '+f.name+' is '+(NO[ext]||'not a supported type')+'. Supported: GBA, SNES, NES, Game Boy/Color, Genesis, Master System, Game Gear, PC Engine.');return}
  const g={f,file:f.name,sys:EXT[ext],ext:ext,title:cleanTitle(f.name)};
  const r=document.createElement('div');r.className='game';
- r.innerHTML='<div class="prev"><canvas class="ic" width="144" height="80"></canvas><canvas class="bg" width="142" height="80"></canvas></div><div><input type="text" maxlength="48" aria-label="Title on the PSP menu"><div class="meta"></div></div><div class="btns"><label class="lbl">Own picture<input type="file" accept="image/*" hidden></label><button>Remove</button></div>';
+ const slot=(k,label,tip,acc)=>'<span class="sl"><label class="lbl" title="'+tip+'">'+label+'<input type="file" accept="'+acc+'" data-k="'+k+'" hidden></label><button class="x" aria-label="Reset '+label.toLowerCase()+'" title="Back to automatic" hidden>✕</button></span>';
+ r.innerHTML='<div class="prev"><canvas class="ic" width="144" height="80" title="Icon"></canvas><canvas class="bg" width="142" height="80" title="Background"></canvas></div>'+
+  '<div><input type="text" maxlength="48" aria-label="Title on the PSP menu"><div class="meta"></div>'+
+  '<div class="slots">'+slot('icon','Icon','Small picture in the menu (144×80)','image/*')+slot('bg','Background','Big picture behind the menu while highlighted (480×272)','image/*')+slot('snd','Sound','Plays while the game is highlighted (up to 29 s)','audio/*,.at3,.mp3,.wav,.ogg,.m4a,.flac,.aac')+'</div>'+
+  '<div class="snd" hidden><b class="sname"></b><label>start <input type="number" class="st" min="0" step="0.5" value="0"> s</label><button class="pv">Play</button><span class="sinfo"></span></div></div>'+
+  '<div class="btns"><button class="rm">Remove</button></div>';
  g.row=r;const inp=r.querySelector('input[type=text]');inp.value=g.title;r.querySelector('.meta').textContent=SYS[g.sys].name+' · '+(f.size/1048576).toFixed(1)+' MB';
- inp.oninput=()=>{g.title=inp.value.trim()||'Game';if(!g.custom&&!g.real)art(g)};
- r.querySelector('.lbl input').onchange=async(e)=>{const p=e.target.files[0];if(p){g.custom=await createImageBitmap(p);art(g)}};
- r.querySelector('button').onclick=()=>{games.splice(games.indexOf(g),1);r.remove();$('#go').style.display=games.length?'block':'none'};
+ inp.oninput=()=>{g.title=inp.value.trim()||'Game';if(!g.cIcon||!g.cBg)art(g)};
+ for(const k of ['icon','bg'])r.querySelector('[data-k='+k+']').onchange=async(e)=>{const p=e.target.files[0];e.target.value='';if(!p)return;
+  try{g[k==='icon'?'cIcon':'cBg']=await createImageBitmap(p);r.querySelector('[data-k='+k+']').closest('.sl').querySelector('.x').hidden=false;art(g)}catch(err){say('Could not read that picture ('+p.name+'). Use a PNG, JPG, GIF or WebP.')}};
+ r.querySelectorAll('.sl .x').forEach((x)=>x.onclick=()=>{const k=x.parentNode.querySelector('input').dataset.k;if(k==='snd')clearSnd(g);else{g[k==='icon'?'cIcon':'cBg']=null;x.hidden=true;art(g)}});
+ r.querySelector('[data-k=snd]').onchange=(e)=>{const p=e.target.files[0];e.target.value='';if(p)setSnd(g,p)};
+ r.querySelector('.st').oninput=()=>{stopPrev(g);sndInfo(g)};r.querySelector('.pv').onclick=()=>playPrev(g);
+ r.querySelector('.rm').onclick=()=>{stopPrev(g);games.splice(games.indexOf(g),1);r.remove();$('#go').style.display=games.length?'block':'none'};
  games.push(g);$('#list').append(r);$('#go').style.display='block';art(g)}
 function take(fl){say('');[...fl].forEach(add)}
 $('#file').onchange=(e)=>{take(e.target.files);e.target.value=''};
@@ -95,11 +137,12 @@ const dz=$('#drop');dz.ondragover=(e)=>{e.preventDefault();dz.classList.add('ove
 const png=async(c)=>new Uint8Array(await (await new Promise(r=>c.toBlob(r,'image/png'))).arrayBuffer());
 $('#go').onclick=async()=>{const btn=$('#go');btn.disabled=true;say('');const files=[],used={};
  try{const prx=await inflate('prx'),psp=await inflate('launcher');
-  for(let i=0;i<games.length;i++){const g=games[i];btn.textContent='Building '+(i+1)+' of '+games.length+'…';
+  for(let i=0;i<games.length;i++){const g=games[i],tag=' '+(i+1)+' of '+games.length;btn.textContent='Building'+tag+'…';
    let fold=slug(g.title),n=1;while(used[fold])fold=slug(g.title).slice(0,21)+'_'+(++n);used[fold]=1;
    const base='PSP/GAME/'+fold+'/',romName=fold+'.'+g.ext,core=await inflate(SYS[g.sys].core);
-   const eb=pbp(sfo(g.title),await png(g.ic),await png(g.pc),psp);
-   files.push({name:base+'EBOOT.PBP',data:new Uint8Array(await eb.arrayBuffer())},{name:base+'CORE.PBP',data:core},{name:base+'kernel_functions.prx',data:prx},
+   let snd=g.at3||null;if(!snd&&g.pcm){btn.textContent='Encoding sound'+tag+'…';await new Promise((r)=>setTimeout(r,30));snd=encodeSnd(g)}
+   const eba=new Uint8Array(await pbp(sfo(g.title),await png(g.ic),await png(g.pc),psp,snd).arrayBuffer());checkPbp(eba);
+   files.push({name:base+'EBOOT.PBP',data:eba},{name:base+'CORE.PBP',data:core},{name:base+'kernel_functions.prx',data:prx},
     {name:base+'launch.txt',data:new TextEncoder().encode('CORE.PBP\n'+romName+'\n')},{name:base+romName,data:new Uint8Array(await g.f.arrayBuffer())})}
   const url=URL.createObjectURL(zipStore(files));
   $('#done').style.display='block';$('#done').innerHTML='<b>Done: '+games.length+' game'+(games.length>1?'s':'')+' ready.</b> <a download="PSP_Games.zip" href="'+url+'">Download PSP_Games.zip</a><br>Then follow the steps below.';

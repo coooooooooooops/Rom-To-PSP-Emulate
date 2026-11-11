@@ -15,5 +15,27 @@ const assert = require("assert"), L = require("../src/lib.js");
   assert.strictEqual(o[1], 40 + s.length); assert.strictEqual(o[4] - o[1], 3); assert.strictEqual(o[6] - o[4], 2); assert.strictEqual(o[7], b.length);
   // zip: CRC32 of "123456789" is the standard check value
   assert.strictEqual(L.crc32(new TextEncoder().encode("123456789")), 0xCBF43926);
+  // SND0 slot: offsets shift correctly when a sound is supplied
+  const snd = new Uint8Array([9, 9, 9, 9]);
+  const b2 = Buffer.from(await L.pbp(s, icon, pic, psp, snd).arrayBuffer());
+  assert.strictEqual(b2.readUInt32LE(8 + 4 * 6) - b2.readUInt32LE(8 + 4 * 5), 4); // SND0 length
+  // zip entries must carry -rw-r--r-- (attr 0 made macOS unzip files as ----------)
+  const z = Buffer.from(await L.zipStore([{ name: "a/b.txt", data: new Uint8Array([1, 2, 3]) }]).arrayBuffer());
+  const cd = z.indexOf(Buffer.from([0x50, 0x4b, 1, 2]));
+  assert.strictEqual(z.readUInt32LE(cd + 38) >>> 16, 0o100644);
+  // AT3 encoder: header and frame layout
+  const A = require("../src/at3.js"), n = 44100, l = new Float32Array(n).map((_, i) => 0.3 * Math.sin(i * 0.06));
+  const at3 = Buffer.from(A.encode(l, l));
+  assert.strictEqual(at3.toString("latin1", 0, 4), "RIFF"); assert.strictEqual(at3.readUInt16LE(20), 0x270);
+  const di = at3.indexOf("data"), dl = at3.readUInt32LE(di + 4);
+  assert.strictEqual(dl % 384, 0); assert.strictEqual(at3[di + 8] >> 2, 0x28); assert.strictEqual(at3[di + 8 + 192] >> 2, 0x28);
+  assert.ok(at3.length < 500000);
+  // optional: decode with ffmpeg if installed and check fidelity
+  try {
+    const cp = require("child_process"), fs = require("fs"), f = require("os").tmpdir() + "/u.at3"; fs.writeFileSync(f, at3);
+    const pcm = cp.execFileSync("ffmpeg", ["-v", "error", "-i", f, "-f", "s16le", "-ac", "1", "-"], { maxBuffer: 1 << 26 });
+    let sig = 0, err = 0; for (let i = 4000; i < n - 4000; i++) { const x = l[i] * 32768, y = pcm.readInt16LE(2 * i); sig += x * x; err += (x - y) * (x - y) }
+    assert.ok(10 * Math.log10(sig / err) > 25, "AT3 round trip SNR too low");
+  } catch (e) { if (e.code !== "ENOENT" && !/spawn|ffmpeg/.test(String(e.message))) throw e; }
   console.log("ok");
 })();

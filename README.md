@@ -1,13 +1,13 @@
 <p align="center"><img src="banner.svg" alt="ROM to PSP" width="100%"></p>
 
-**ROM to PSP** is a single web page that turns your own game dumps into standalone apps for a PSP running custom firmware. Drop in a ROM and you get a ready-to-copy folder with its own icon and background on the XMB Memory Stick menu. Pressing X boots straight into the game: no RetroArch menus, no playlists.
+**ROM to PSP** is a single web page that turns your own game dumps into standalone apps for a PSP running custom firmware. Drop in a ROM and you get a ready-to-copy folder with its own icon, background and menu sound on the XMB Memory Stick menu. Pressing X boots straight into the game: no RetroArch menus, no playlists.
 
 Everything runs in your browser. ROMs are never uploaded anywhere.
 
 ## Use it
 
 1. Open the page (`docs/index.html`, or the GitHub Pages link once you enable it, see below).
-2. Drop one or more ROMs. Check the title, optionally add your own picture.
+2. Drop one or more ROMs. Check the title. Optionally pick your own **Icon** (small box, 144x80), **Background** (full screen, 480x272) and **Sound** (plays while the game is highlighted). Each is independent; the ✕ goes back to automatic.
 3. Press **Build my PSP folders** and download `PSP_Games.zip`.
 4. Unzip it and copy the game folders into `PSP/GAME` on the Memory Stick.
 5. Open **Game > Memory Stick** on the PSP. Press HOME to quit a game.
@@ -46,6 +46,10 @@ The launcher reads `launch.txt`, loads `kernel_functions.prx`, and calls `exitsp
 
 The page builds the `EBOOT.PBP` itself in JavaScript: it writes a `PARAM.SFO`, adds the two PNGs, and appends the prebuilt launcher binary. The zip is written by a small built-in zip writer, so the page has no runtime dependencies.
 
+### Sound
+
+Any MP3, WAV, OGG, M4A or FLAC works. The page decodes it in your browser, lets you choose the start point and previews it, then encodes it to ATRAC3 (132 kbps, stereo) as `SND0.AT3` inside `EBOOT.PBP`. The PSP limit is about 29 s / 500 KB, so longer clips are cut. A ready-made `.at3` is used as it is. The encoder (`src/at3.js`) is written from scratch for this project; its output decodes cleanly in FFmpeg, but it has **not been tried on real hardware yet**. If a PSP refuses the sound, leave Sound empty or supply an `.at3` made with Sony's tools.
+
 ### Artwork
 
 When the page is served over http(s) with internet access, it looks up the matching title screen and gameplay screenshot from the [libretro-thumbnails](https://github.com/libretro-thumbnails) repositories, using the ROM's filename (No-Intro naming works best). If nothing matches, or you are offline, it draws a title card instead. **Own picture** lets you use any image. Pages hosted in sandboxes that block outside requests will always use the generated card.
@@ -55,7 +59,8 @@ When the page is served over http(s) with internet access, it looks up the match
 ```
 docs/index.html        the built, self-contained site (what GitHub Pages serves)
 src/template.html      page markup, styles and UI code
-src/lib.js             PBP, SFO and zip writers, system and extension tables
+src/lib.js             PBP, SFO and zip writers, EBOOT self-check, system and extension tables
+src/at3.js             ATRAC3 encoder for SND0.AT3
 src/launcher/          C source of the PSP launcher (PSP SDK)
 assets/cores/          the libretro PSP cores embedded in the page
 assets/kernel_functions.prx
@@ -98,3 +103,9 @@ Found by running every core through the real launcher chain in PPSSPP (headless)
 - `--rebuild-launcher` works with current pspdev (no `pack-pbp`).
 
 Verified in PPSSPP: NES, GBA, GB, GBC, SNES, Mega Drive, Master System, Game Gear, PC Engine all boot and render. Not verified on real hardware.
+
+## Fixes (Nov 2026, round 2)
+
+- **Corrupted-data folders.** The zip writer stored every file with Unix permissions `----------`, so unzipping on a Mac produced unreadable files and a partly copied game folder, which the XMB shows as corrupted data. Entries are now `-rw-r--r--`. The page also checks each finished EBOOT (header, SFO keys, PNG sizes, sound) before zipping.
+- Icon, background and sound are chosen separately.
+- New `SND0.AT3` support (see Sound). Not verified on real hardware.
