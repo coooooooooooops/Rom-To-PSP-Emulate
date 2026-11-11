@@ -10,7 +10,8 @@ Everything runs in your browser. ROMs are never uploaded anywhere.
 2. Drop one or more ROMs. Check the title. Optionally pick your own **Icon** (small box, 144x80), **Background** (full screen, 480x272) and **Sound** (plays while the game is highlighted). Each is independent; the ✕ goes back to automatic.
 3. Press **Build my PSP folders** and download `PSP_Games.zip`.
 4. Unzip it and copy the game folders into `PSP/GAME` on the Memory Stick.
-5. Open **Game > Memory Stick** on the PSP. Press HOME to quit a game.
+5. In ARK's settings set **Use extra memory** to **Max**. Large games such as Zelda: The Minish Cap (16 MB GBA) crash to a black screen and power the PSP off without it.
+6. Open **Game > Memory Stick** on the PSP. Press HOME to quit a game.
 
 Saves go to `PSP/RETROARCH` on the stick. Every game gets a unique ROM filename, so saves never overwrite each other.
 
@@ -109,3 +110,5 @@ Verified in PPSSPP: NES, GBA, GB, GBC, SNES, Mega Drive, Master System, Game Gea
 - **Corrupted-data folders.** The zip writer stored every file with Unix permissions `----------`, so unzipping on a Mac produced unreadable files and a partly copied game folder, which the XMB shows as corrupted data. Entries are now `-rw-r--r--`. The page also checks each finished EBOOT (header, SFO keys, PNG sizes, sound) before zipping.
 - Icon, background and sound are chosen separately.
 - New `SND0.AT3` support (see Sound). Not verified on real hardware.
+
+- **Extra memory.** Minish Cap boots in PPSSPP in 2000/3000 mode but crashes in PSP-1000 mode, and on a real PSP-3000 with ARK 5 it needed **Use extra memory = Max**. The page and README now say so.
