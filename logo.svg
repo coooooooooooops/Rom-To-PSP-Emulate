@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="ROM to PSP logo">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1c4bc4"/><stop offset="1" stop-color="#070f26"/></linearGradient></defs>
+<rect x="8" y="8" width="240" height="240" rx="56" fill="url(#g)"/>
+<path d="M8 170c50-34 90 18 140-10s70-24 100-6v94a56 56 0 0 1-56 56H64A56 56 0 0 1 8 248z" fill="#6f9bff" opacity=".22"/>
+<path d="M8 196c56-26 96 22 148-4s64-18 92-4v60a56 56 0 0 1-56 56H64A56 56 0 0 1 8 248z" fill="#6f9bff" opacity=".22"/>
+<path d="M92 48h72a12 12 0 0 1 12 12v118l-18 22H98l-18-22V60a12 12 0 0 1 12-12z" fill="#eaf0ff"/>
+<rect x="98" y="66" width="60" height="46" rx="6" fill="#1f5bff"/>
+<path d="M120 77v24l20-12z" fill="#fff"/>
+<rect x="100" y="204" width="56" height="8" rx="3" fill="#0a1633" opacity=".35"/>
+</svg>

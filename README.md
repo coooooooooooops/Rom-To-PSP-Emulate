@@ -1,0 +1,100 @@
+<p align="center"><img src="banner.svg" alt="ROM to PSP" width="100%"></p>
+
+**ROM to PSP** is a single web page that turns your own game dumps into standalone apps for a PSP running custom firmware. Drop in a ROM and you get a ready-to-copy folder with its own icon and background on the XMB Memory Stick menu. Pressing X boots straight into the game: no RetroArch menus, no playlists.
+
+Everything runs in your browser. ROMs are never uploaded anywhere.
+
+## Use it
+
+1. Open the page (`docs/index.html`, or the GitHub Pages link once you enable it, see below).
+2. Drop one or more ROMs. Check the title, optionally add your own picture.
+3. Press **Build my PSP folders** and download `PSP_Games.zip`.
+4. Unzip it and copy the game folders into `PSP/GAME` on the Memory Stick.
+5. Open **Game > Memory Stick** on the PSP. Press HOME to quit a game.
+
+Saves go to `PSP/RETROARCH` on the stick. Every game gets a unique ROM filename, so saves never overwrite each other.
+
+## Supported systems
+
+Only systems that run well on a PSP-3000 are accepted. Anything else is turned away with a short explanation.
+
+| System | Extensions | Core |
+| --- | --- | --- |
+| Game Boy Advance | `.gba` | gpSP |
+| Super Nintendo | `.sfc` `.smc` `.swc` `.fig` | snes9x2005 |
+| NES | `.nes` | FCEUmm |
+| Game Boy / Game Boy Color | `.gb` `.gbc` | Gambatte |
+| Mega Drive / Genesis, Master System, Game Gear | `.md` `.gen` `.smd` `.sms` `.gg` | PicoDrive |
+| PC Engine / TurboGrafx-16 | `.pce` | Mednafen PCE Fast |
+
+Not supported on purpose: N64 (too slow on PSP hardware), PS2, GameCube, Dreamcast and Saturn. For PS1, use the PSP's built-in PS1 support instead.
+
+## How it works
+
+Each game folder is self-contained:
+
+```
+PSP/GAME/SONIC_THE_HEDGEHOG_2/
+  EBOOT.PBP            launcher with the game's title, icon (144x80) and background (480x272)
+  CORE.PBP             the libretro core for that system
+  kernel_functions.prx RetroArch helper module that lets the launcher start another executable
+  launch.txt           two lines: core file name, ROM file name
+  SONIC_THE_HEDGEHOG_2.md
+```
+
+The launcher reads `launch.txt`, loads `kernel_functions.prx`, and calls `exitspawn_kernel` with the core as the target and the ROM path as its second argument. That is the same argument layout RetroArch's own Salamander launcher uses, and a RetroArch PSP core treats `argv[1]` as the content to load.
+
+The page builds the `EBOOT.PBP` itself in JavaScript: it writes a `PARAM.SFO`, adds the two PNGs, and appends the prebuilt launcher binary. The zip is written by a small built-in zip writer, so the page has no runtime dependencies.
+
+### Artwork
+
+When the page is served over http(s) with internet access, it looks up the matching title screen and gameplay screenshot from the [libretro-thumbnails](https://github.com/libretro-thumbnails) repositories, using the ROM's filename (No-Intro naming works best). If nothing matches, or you are offline, it draws a title card instead. **Own picture** lets you use any image. Pages hosted in sandboxes that block outside requests will always use the generated card.
+
+## Repo layout
+
+```
+docs/index.html        the built, self-contained site (what GitHub Pages serves)
+src/template.html      page markup, styles and UI code
+src/lib.js             PBP, SFO and zip writers, system and extension tables
+src/launcher/          C source of the PSP launcher (PSP SDK)
+assets/cores/          the libretro PSP cores embedded in the page
+assets/kernel_functions.prx
+assets/launcher/launcher.psp   prebuilt launcher binary
+tools/build.py         assembles docs/index.html from the above
+tests/unit.js          checks the PBP, SFO and zip writers
+```
+
+## Build from source
+
+```
+python3 tools/build.py                      # needs only Python 3
+node tests/unit.js                          # optional checks
+
+# only if you change src/launcher:
+export PSPDEV=/path/to/pspdev               # https://pspdev.github.io/
+python3 tools/build.py --rebuild-launcher
+```
+
+To add a system, drop its PSP core into `assets/cores/`, add it to `CORES` in `tools/build.py`, and add its entries to `SYS` and `EXT` in `src/lib.js`. The page embeds every core compressed, so keep the total under about 16 MB if you host it somewhere with a file size limit.
+
+## Host it
+
+GitHub Pages: **Settings > Pages > Deploy from a branch > `main` / `/docs`**. Any static host works, since the site is one HTML file.
+
+## Status
+
+The folder layout and launcher approach were checked on a PSP-3000 with ARK custom firmware using GBA, SNES and Mega Drive games. The `launch.txt`-based launcher in this repo is a later revision of that launcher and the NES, Game Boy, Master System, Game Gear and PC Engine cores have not been run on hardware yet. Test one game of each system before loading many, and please open an issue with what the PSP shows if something fails: the launcher prints the name of any file it cannot find.
+
+## Legal
+
+No ROMs, BIOS files or game art are included. Use dumps of games you own. The bundled cores and helper module are third-party software with their own licences; see [NOTICE.md](NOTICE.md). This project is not affiliated with Sony, Nintendo, Sega, NEC or the libretro project.
+
+## Core fixes (Nov 2026)
+
+Found by running every core through the real launcher chain in PPSSPP (headless) with test ROMs:
+
+- **Game Boy / Game Boy Color (Gambatte) crashed on load.** The buildbot core keeps its C++ static constructors in `.init_array`, but the PSP startup code only runs the legacy `.ctors` list, so the global `GB` object was never constructed (NULL pointer write). `tools/corefix.py` patches `_init` to also run `.init_array`; `tools/build.py` applies it while embedding (same fix applies to PC Engine). The files in `assets/cores` stay byte-identical to upstream.
+- **GBA (gpSP) crashed when the user memory partition was the small one.** The generated launcher EBOOT now sets `MEMSIZE=1`, the same as the cores and RetroArch's own launcher.
+- `--rebuild-launcher` works with current pspdev (no `pack-pbp`).
+
+Verified in PPSSPP: NES, GBA, GB, GBC, SNES, Mega Drive, Master System, Game Gear, PC Engine all boot and render. Not verified on real hardware.

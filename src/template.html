@@ -1,0 +1,110 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>ROM to PSP</title>
+<!--FAVICON-->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@600;800&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<style>
+:root{--bg:#e9f0ff;--bg2:#cfe0ff;--ink:#0a1633;--mut:#43557f;--card:#ffffffcc;--line:#0a163325;--acc:#1f5bff;--onacc:#fff;--ok:#0b7a4b;--bad:#b3261e;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);font-family:"IBM Plex Sans",system-ui,sans-serif}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#070f26;--bg2:#12327a;--ink:#eaf0ff;--mut:#9db0de;--card:#0d1b45cc;--line:#ffffff26;--acc:#6f9bff;--onacc:#06122e;--ok:#5fe0a1;--bad:#ff8a80;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#070f26;--bg2:#12327a;--ink:#eaf0ff;--mut:#9db0de;--card:#0d1b45cc;--line:#ffffff26;--acc:#6f9bff;--onacc:#06122e;--ok:#5fe0a1;--bad:#ff8a80;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:radial-gradient(120% 80% at 80% -10%,var(--bg2),transparent 60%),radial-gradient(90% 60% at -10% 110%,var(--bg2),transparent 55%),var(--bg);min-height:100vh;line-height:1.5}
+main{max-width:880px;margin:0 auto;padding:40px 20px 64px}
+h1{font:800 clamp(2rem,6vw,3.4rem)/1.05 Sora,sans-serif;margin:0 0 12px;letter-spacing:-.02em}
+h2{font:600 1.15rem Sora,sans-serif;margin:36px 0 12px}
+p.lead{font-size:1.1rem;color:var(--mut);max-width:60ch;margin:0 0 24px}
+#drop{display:block;border:2px dashed var(--acc);border-radius:20px;padding:34px 20px;text-align:center;background:var(--card);cursor:pointer;transition:background .15s}
+#drop.over{background:var(--bg2)}#drop b{font:600 1.2rem Sora,sans-serif;display:block}#drop span{color:var(--mut)}
+#drop:focus-within{outline:3px solid var(--acc);outline-offset:3px}
+.sys{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0;list-style:none}.sys li{font-size:.85rem;border:1px solid var(--line);border-radius:99px;padding:2px 12px;background:var(--card)}
+#msg{min-height:1.5em;margin:12px 0 0;color:var(--bad)}#msg.ok{color:var(--ok)}
+.game{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin:12px 0}
+.prev{display:flex;gap:10px;align-items:center}.prev canvas{border-radius:8px;display:block;background:#000}
+.prev .ic{width:144px;height:80px}.prev .bg{width:142px;height:80px}
+.game input[type=text]{width:100%;font:600 1rem "IBM Plex Sans",sans-serif;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink)}
+.meta{font-size:.85rem;color:var(--mut);margin-top:4px}.btns{display:flex;flex-direction:column;gap:6px}
+button,.lbl{font:600 .9rem "IBM Plex Sans",sans-serif;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);padding:7px 12px;cursor:pointer;text-align:center}
+button:hover,.lbl:hover{border-color:var(--acc)}button:focus-visible,.lbl:focus-within{outline:3px solid var(--acc);outline-offset:2px}
+#go{display:none;margin-top:18px;background:var(--acc);color:var(--onacc);border:0;font:800 1.05rem Sora,sans-serif;padding:14px 26px;border-radius:14px}
+#go[disabled]{opacity:.6;cursor:wait}
+#done{display:none;margin-top:18px;background:var(--card);border:1px solid var(--acc);border-radius:16px;padding:16px}
+#done a{color:var(--acc);font-weight:700}
+ol.steps{padding-left:22px}ol.steps li{margin:8px 0;max-width:68ch}
+.note{color:var(--mut);font-size:.92rem;max-width:68ch}
+@media(max-width:640px){.game{grid-template-columns:1fr}.prev{justify-content:center}.btns{flex-direction:row}}
+</style></head><body><main>
+<h1>Drop a ROM.<br>Get a PSP icon.</h1>
+<p class="lead">Each game becomes its own app on the PSP Memory Stick menu, with its own icon and background, and starts straight into the game. No RetroArch menus.</p>
+<label id="drop" tabindex="-1"><input id="file" type="file" multiple hidden accept=".gba,.sfc,.smc,.swc,.fig,.nes,.gb,.gbc,.md,.gen,.smd,.sms,.gg,.pce,.bin,.zip,.z64,.n64,.v64,.iso,.cue,.chd"><b>Drop ROMs here or click to choose</b><span>Several at once is fine. Files never leave your device.</span></label>
+<ul class="sys" aria-label="Supported systems"></ul>
+<p id="msg" role="status" aria-live="polite"></p>
+<div id="list"></div>
+<button id="go">Build my PSP folders</button>
+<div id="done"></div>
+<h2>Put them on the PSP</h2>
+<ol class="steps">
+<li>Connect the PSP to your computer. On the PSP choose Settings, USB Connection, or take the Memory Stick out and use a card reader.</li>
+<li>Unzip the download. Copy the <b>GAME</b> folder contents (the game folders) into <b>PSP/GAME</b> on the Memory Stick. If it asks, merge.</li>
+<li>Unplug, then open Game, Memory Stick on the XMB. Each game has its own icon.</li>
+<li>Start with one game to check it works before copying lots. If something is missing, the PSP shows which file it could not find.</li>
+<li>Press HOME to quit back to the XMB. Saves are written to <b>PSP/RETROARCH</b> on the stick, and every game gets its own file.</li>
+</ol>
+<p class="note">Needs a PSP running custom firmware such as ARK. Only systems that run well on a PSP-3000 are accepted: N64, PS2, GameCube, Dreamcast and Saturn are too heavy, and PS1 games are better run with the PSP's built-in PS1 support.</p>
+<p class="note" id="artnote"></p>
+</main>
+<script>
+/*LIB*/
+/*BLOBS*/
+const $=(s)=>document.querySelector(s), games=[], cache={};
+const CN={gba:'GBA',snes:'SNES',nes:'NES',gb:'Game Boy / Color',md:'Mega Drive, Master System, Game Gear',pce:'PC Engine'};
+$('.sys').innerHTML=Object.values(SYS).map(s=>'<li>'+s.name+'</li>').join('');
+const say=(t,ok)=>{$('#msg').textContent=t;$('#msg').className=ok?'ok':''};
+const b64=(s)=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function inflate(k){if(cache[k])return cache[k];const r=new Response(new Blob([b64(BL[k])]).stream().pipeThrough(new DecompressionStream('deflate-raw')));return cache[k]=new Uint8Array(await r.arrayBuffer())}
+function cv(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c}
+function onbg(im,w,h,sc){const c=cv(w,h),x=c.getContext('2d');const s0=Math.max(w/im.width,h/im.height);
+ x.filter='blur(8px) brightness(.5)';x.drawImage(im,(w-im.width*s0)/2,(h-im.height*s0)/2,im.width*s0,im.height*s0);x.filter='none';
+ const s=Math.min(w*sc/im.width,h*sc/im.height),dw=im.width*s,dh=im.height*s;x.shadowColor='#000a';x.shadowBlur=8;x.drawImage(im,(w-dw)/2,(h-dh)/2,dw,dh);return c}
+function card(g,w,h){const c=cv(w,h),x=c.getContext('2d'),H=SYS[g.sys].hue,gr=x.createLinearGradient(0,0,w,h);
+ gr.addColorStop(0,'hsl('+H+',70%,38%)');gr.addColorStop(1,'hsl('+(H+40)+',75%,14%)');x.fillStyle=gr;x.fillRect(0,0,w,h);
+ const fs=Math.round(h*.17);x.fillStyle='#fff';x.font='800 '+fs+'px Sora,system-ui,sans-serif';x.textBaseline='top';
+ const words=g.title.split(' '),lines=[];let cur='';for(const wd of words){const t=cur?cur+' '+wd:wd;if(x.measureText(t).width>w*.84&&cur){lines.push(cur);cur=wd}else cur=t}lines.push(cur);
+ const shown=lines.slice(0,3),y0=(h-shown.length*fs*1.1)/2;shown.forEach((l,i)=>x.fillText(l,w*.08,y0+i*fs*1.1));
+ x.font='600 '+Math.round(h*.085)+'px system-ui,sans-serif';x.fillStyle='#ffffffcc';x.fillText(SYS[g.sys].name,w*.08,h*.86);return c}
+const load=(src)=>new Promise((res,rej)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>res(i);i.onerror=rej;i.src=src});
+async function thumb(g,kind){try{const n=g.file.replace(/\.[^.]+$/,'').replace(/[&*\/:`<>?\\|]/g,'_');
+ return await Promise.race([load('https://raw.githubusercontent.com/libretro-thumbnails/'+SYS[g.sys].repo+'/master/'+kind+'/'+encodeURIComponent(n)+'.png'),new Promise((_,r)=>setTimeout(r,5000))])}catch(e){return null}}
+async function art(g){let ic=null,pc=null;
+ if(g.custom){ic=onbg(g.custom,144,80,.96);pc=onbg(g.custom,480,272,1)}
+ else{const t=await thumb(g,'Named_Titles'),s=await thumb(g,'Named_Snaps');g.real=!!(t||s);
+  ic=t?onbg(t,144,80,.96):card(g,144,80);pc=(s||t)?onbg(s||t,480,272,1):card(g,480,272)}
+ g.ic=ic;g.pc=pc;g.row.querySelector('.ic').getContext('2d').drawImage(ic,0,0);const b=g.row.querySelector('.bg').getContext('2d');b.clearRect(0,0,142,80);b.drawImage(pc,0,0,142,80)}
+function add(f){const ext=f.name.split('.').pop().toLowerCase();
+ if(!EXT[ext]){say('Not added: '+f.name+' is '+(NO[ext]||'not a supported type')+'. Supported: GBA, SNES, NES, Game Boy/Color, Genesis, Master System, Game Gear, PC Engine.');return}
+ const g={f,file:f.name,sys:EXT[ext],ext:ext,title:cleanTitle(f.name)};
+ const r=document.createElement('div');r.className='game';
+ r.innerHTML='<div class="prev"><canvas class="ic" width="144" height="80"></canvas><canvas class="bg" width="142" height="80"></canvas></div><div><input type="text" maxlength="48" aria-label="Title on the PSP menu"><div class="meta"></div></div><div class="btns"><label class="lbl">Own picture<input type="file" accept="image/*" hidden></label><button>Remove</button></div>';
+ g.row=r;const inp=r.querySelector('input[type=text]');inp.value=g.title;r.querySelector('.meta').textContent=SYS[g.sys].name+' · '+(f.size/1048576).toFixed(1)+' MB';
+ inp.oninput=()=>{g.title=inp.value.trim()||'Game';if(!g.custom&&!g.real)art(g)};
+ r.querySelector('.lbl input').onchange=async(e)=>{const p=e.target.files[0];if(p){g.custom=await createImageBitmap(p);art(g)}};
+ r.querySelector('button').onclick=()=>{games.splice(games.indexOf(g),1);r.remove();$('#go').style.display=games.length?'block':'none'};
+ games.push(g);$('#list').append(r);$('#go').style.display='block';art(g)}
+function take(fl){say('');[...fl].forEach(add)}
+$('#file').onchange=(e)=>{take(e.target.files);e.target.value=''};
+const dz=$('#drop');dz.ondragover=(e)=>{e.preventDefault();dz.classList.add('over')};dz.ondragleave=()=>dz.classList.remove('over');dz.ondrop=(e)=>{e.preventDefault();dz.classList.remove('over');take(e.dataTransfer.files)};
+const png=async(c)=>new Uint8Array(await (await new Promise(r=>c.toBlob(r,'image/png'))).arrayBuffer());
+$('#go').onclick=async()=>{const btn=$('#go');btn.disabled=true;say('');const files=[],used={};
+ try{const prx=await inflate('prx'),psp=await inflate('launcher');
+  for(let i=0;i<games.length;i++){const g=games[i];btn.textContent='Building '+(i+1)+' of '+games.length+'…';
+   let fold=slug(g.title),n=1;while(used[fold])fold=slug(g.title).slice(0,21)+'_'+(++n);used[fold]=1;
+   const base='PSP/GAME/'+fold+'/',romName=fold+'.'+g.ext,core=await inflate(SYS[g.sys].core);
+   const eb=pbp(sfo(g.title),await png(g.ic),await png(g.pc),psp);
+   files.push({name:base+'EBOOT.PBP',data:new Uint8Array(await eb.arrayBuffer())},{name:base+'CORE.PBP',data:core},{name:base+'kernel_functions.prx',data:prx},
+    {name:base+'launch.txt',data:new TextEncoder().encode('CORE.PBP\n'+romName+'\n')},{name:base+romName,data:new Uint8Array(await g.f.arrayBuffer())})}
+  const url=URL.createObjectURL(zipStore(files));
+  $('#done').style.display='block';$('#done').innerHTML='<b>Done: '+games.length+' game'+(games.length>1?'s':'')+' ready.</b> <a download="PSP_Games.zip" href="'+url+'">Download PSP_Games.zip</a><br>Then follow the steps below.';
+  const a=document.createElement('a');a.href=url;a.download='PSP_Games.zip';a.click();
+ }catch(e){say('Build failed: '+e.message)}
+ btn.disabled=false;btn.textContent='Build my PSP folders'};
+if(location.protocol==='https:'||1)setTimeout(()=>{if(games.length&&!games.some(g=>g.real))$('#artnote').textContent='Box art lookup needs internet access to GitHub. Games without it get a generated title card; use Own picture to set your own.'},0);
+</script></body></html>
