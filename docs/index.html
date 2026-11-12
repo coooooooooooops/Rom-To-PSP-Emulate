@@ -65,18 +65,18 @@ button,.lbl{transition:background .2s,border-color .2s,transform .2s;border-radi
 <button id="go">Build my PSP folders</button>
 <div id="done"></div>
 </section>
-<section class="panel" id="p1" hidden><div class="xhead"><b>Repair</b><span>Fix zips you already built</span></div><p class="note">Saves not sticking, so the game starts fresh every time? Older zips lack the save folders the PSP needs. Drop one or many old <b>PSP_Games.zip</b> files here and get fixed copies back. Your games, art and sound are copied as they are; nothing is rebuilt or uploaded.</p>
+<section class="panel" id="p1" hidden><div class="xhead"><b>Repair</b><span>Fix zips you already built</span></div><p class="note">Saves not sticking, so the game starts fresh every time? Older zips lack the settings file and save folders the PSP cores need (<b>PSP/RETROARCH</b>). Drop one or many old <b>PSP_Games.zip</b> files here and get fixed copies back. Your games, art and sound are copied as they are; nothing is rebuilt or uploaded.</p>
 <label id="fixdrop" class="lbl" style="display:block;padding:18px;border-style:dashed"><input id="fixfile" type="file" accept=".zip,application/zip" multiple hidden><b>Drop zips here or click to choose</b></label>
 <div id="fixlist"></div>
 <button id="fixall" style="display:none;margin-top:10px">Download all fixed zips</button>
 </section>
 <section class="panel" id="p2" hidden><div class="xhead"><b>Install</b><span>Put the games on the Memory Stick</span></div><ol class="steps">
 <li>Connect the PSP to your computer. On the PSP choose Settings, USB Connection, or take the Memory Stick out and use a card reader.</li>
-<li>Unzip the download. Copy the <b>GAME</b> folder contents (the game folders) into <b>PSP/GAME</b> on the Memory Stick. If it asks, merge.</li>
+<li>Unzip the download. Copy the whole <b>PSP</b> folder from the zip onto the <b>PSP</b> folder of the Memory Stick (it holds <b>GAME</b> with your games and <b>RETROARCH</b> with the save settings, and both are needed). If it asks, merge.</li>
 <li>Unplug, then open Game, Memory Stick on the XMB. Each game has its own icon and background, and its sound plays while it is highlighted.</li>
 <li>Start with one game to check it works before copying lots. If something is missing, the PSP shows which file it could not find.</li>
 <li><b>Big games (GBA, SNES, Mega Drive and anything over a few MB):</b> in ARK's settings, set <b>Use extra memory</b> to <b>Max</b>. Without it the PSP can show a black screen and switch itself off when the game starts. Zelda: The Minish Cap (16 MB) needs this.</li>
-<li>Press HOME to quit back to the XMB. Game saves and an automatic resume point are written inside each game's own folder (<b>savefiles</b> and <b>savestates</b>), so every game keeps its own progress. Do not delete those folders. If you copy the build over an older copy of a game, choose <b>merge</b> and keep the existing saves.</li>
+<li>Press HOME to quit back to the XMB. Game saves (<b>.srm</b>) and an automatic resume point (<b>.state.auto</b>) are written inside each game's own folder next to its ROM, so every game keeps its own progress. Do not delete them, and do not delete <b>PSP/RETROARCH/retroarch.cfg</b>; without it nothing is saved. If you copy the build over an older copy of a game, choose <b>merge</b> and keep the existing saves.</li>
 </ol>
 <p class="note"><b>Memory tip:</b> if a game goes black and the PSP powers off, set ARK&#39;s <b>Use extra memory</b> to <b>Max</b> and try again. PSP-2000 and 3000 only.</p>
 <p class="note">Needs a PSP running custom firmware such as ARK. Only systems that run well on a PSP-3000 are accepted: N64, PS2, GameCube, Dreamcast and Saturn are too heavy, and PS1 games are better run with the PSP's built-in PS1 support.</p>
@@ -163,13 +163,14 @@ function zipList(b){
   return out;
 }
 const CFG_MARK='# ROM to PSP save settings';
-const SAVE_CFG=CFG_MARK+' (safe to delete; the game still runs, it just may not keep saves)\n'+
- 'savefiles_in_content_dir = "true"\nsavestates_in_content_dir = "true"\nsavestate_auto_save = "true"\nsavestate_auto_load = "true"\n'+
- 'autosave_interval = "10"\nsavestate_thumbnail_enable = "false"\nconfig_save_on_exit = "false"\n';
-const KEEP={savefiles:'Game saves (.srm) are written here. Do not delete this folder.\n',savestates:'Save states are written here. Do not delete this folder.\n',system:'Cores look for BIOS files here. Do not delete this folder.\n'};
-function saveFiles(base,shared){ // base: 'PSP/GAME/NAME/' (game folder) or, with shared=true, 'PSP/RETROARCH/'
-  const enc=new TextEncoder(), out=shared?[{name:base}]:[{name:base+'retroarch.cfg',data:enc.encode(SAVE_CFG)}];
-  for(const k of shared?['savefiles','savestates','system']:['savefiles','savestates'])out.push({name:base+k+'/'},{name:base+k+'/README.txt',data:enc.encode(KEEP[k])});
+const SAVE_CFG=CFG_MARK+' (the PSP cores only read this file from PSP/RETROARCH; do not move it)\n'+
+ 'savefiles_in_content_dir = \"true\"\nsavestates_in_content_dir = \"true\"\nsavestate_auto_save = \"true\"\nsavestate_auto_load = \"true\"\n'+
+ 'autosave_interval = \"10\"\nsavestate_thumbnail_enable = \"false\"\nconfig_save_on_exit = \"false\"\n';
+const KEEP={savefiles:'Fallback folder for game saves (.srm). Do not delete this folder.\n',savestates:'Fallback folder for save states. Do not delete this folder.\n',system:'Cores look for BIOS files here. Do not delete this folder.\n'};
+function saveFiles(base,shared){ // shared=true: base is 'PSP/RETROARCH/' (config + folders the cores need). A game folder needs nothing extra: its saves go next to the ROM.
+  if(!shared)return [];
+  const enc=new TextEncoder(), out=[{name:base},{name:base+'retroarch.cfg',data:enc.encode(SAVE_CFG)}];
+  for(const k of ['savefiles','savestates','system'])out.push({name:base+k+'/'},{name:base+k+'/README.txt',data:enc.encode(KEEP[k])});
   return out;
 }
 function repairZip(bytes){
@@ -177,15 +178,14 @@ function repairZip(bytes){
   for(const e of list){
     const m=/^(.*\/)?eboot\.pbp$/i.exec(e.name); if(!m||/(^|\/)__MACOSX\//.test(e.name))continue;
     const base=m[1]||''; if(!have.has((base+'core.pbp').toLowerCase())&&!have.has((base+'launch.txt').toLowerCase()))continue;
-    bases.push(base); const g=/^(.*?\/)?PSP\/GAME\//i.exec(base); if(g)psp.add((g[1]||'')+'PSP/');
+    bases.push(base); const g=/^(.*?\/)?PSP\/GAME\//i.exec(base); psp.add((g&&g[1]||'')+'PSP/');
   }
   const add=(f)=>{if(!have.has(f.name.toLowerCase())){have.set(f.name.toLowerCase(),f);extra.push(f)}};
-  for(const base of bases){
-    const cfg=have.get(base.toLowerCase()+'retroarch.cfg');
-    if(cfg&&cfg.bytes&&new TextDecoder().decode(cfg.bytes).indexOf(CFG_MARK)!==0&&cfg.method===0)notes.push('kept the retroarch.cfg already in '+base);
-    saveFiles(base,false).forEach(add);
+  for(const p of psp){
+    const cfg=have.get((p+'RETROARCH/retroarch.cfg').toLowerCase());
+    if(cfg&&cfg.method===0&&new TextDecoder().decode(cfg.bytes).indexOf(CFG_MARK)!==0)notes.push('kept the retroarch.cfg already in '+p+'RETROARCH (add the lines from the README, "Core fixes round 4", if saves still fail)');
+    saveFiles(p+'RETROARCH/',true).forEach(add);
   }
-  for(const p of psp)saveFiles(p+'RETROARCH/',true).forEach(add);
   const entries=list.map((e)=>({name:e.name,raw:e})).concat(extra);
   return {entries,games:bases.length,added:extra.length,notes};
 }

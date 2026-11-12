@@ -9,11 +9,11 @@ Everything runs in your browser. ROMs are never uploaded anywhere.
 1. Open the page (`docs/index.html`, or the GitHub Pages link once you enable it, see below).
 2. Drop one or more ROMs. Check the title. Optionally pick your own **Icon** (small box, 144x80), **Background** (full screen, 480x272) and **Sound** (plays while the game is highlighted). Each is independent; the ✕ goes back to automatic.
 3. Press **Build my PSP folders** and download `PSP_Games.zip`.
-4. Unzip it and copy the game folders into `PSP/GAME` on the Memory Stick.
+4. Unzip it and copy the whole **`PSP`** folder onto the Memory Stick's `PSP` folder (merge). It holds `GAME` (your games) **and** `RETROARCH` (the save settings). Copying only the game folders means nothing is saved.
 5. In ARK's settings set **Use extra memory** to **Max**. Large games such as Zelda: The Minish Cap (16 MB GBA) crash to a black screen and power the PSP off without it.
 6. Open **Game > Memory Stick** on the PSP. Press HOME to quit a game.
 
-Saves are written inside each game's own folder (`savefiles/` for in-game saves, `savestates/` for the automatic resume point), so every game keeps its own progress. Do not delete those folders.
+Saves (`.srm`) and the automatic resume point (`.state.auto`) are written inside each game's own folder next to its ROM, so every game keeps its own progress. Do not delete them, or `PSP/RETROARCH/retroarch.cfg`.
 
 ## Supported systems
 
@@ -40,11 +40,10 @@ PSP/GAME/SONIC_THE_HEDGEHOG_2/
   CORE.PBP             the libretro core for that system
   kernel_functions.prx RetroArch helper module that lets the launcher start another executable
   launch.txt           two lines: core file name, ROM file name
-  retroarch.cfg        keeps saves next to the ROM, autosaves, resumes where you stopped
-  savefiles/           in-game saves (.srm)
-  savestates/          automatic save state (.state.auto)
-  SONIC_THE_HEDGEHOG_2.md
-PSP/RETROARCH/         savefiles/ savestates/ system/ (the folders the cores fall back to)
+  SONIC_THE_HEDGEHOG_2.md   the ROM (its .srm save and .state.auto resume point appear next to it)
+PSP/RETROARCH/
+  retroarch.cfg        the ONE settings file the cores read: saves next to the ROM, autosave, resume
+  savefiles/ savestates/ system/   fallback folders the cores expect
 ```
 
 The launcher reads `launch.txt`, loads `kernel_functions.prx`, and calls `exitspawn_kernel` with the core as the target and the ROM path as its second argument. That is the same argument layout RetroArch's own Salamander launcher uses, and a RetroArch PSP core treats `argv[1]` as the content to load.
@@ -124,3 +123,14 @@ Verified in PPSSPP: NES, GBA, GB, GBC, SNES, Mega Drive, Master System, Game Gea
   To start a game from scratch, delete `savestates/<game>.state.auto` (and `savefiles/<game>.srm` to wipe the in-game save).
 - **Repair zips you already built.** New section on the page: drop one or many old `PSP_Games.zip` files and download fixed copies. It adds the save folders and `retroarch.cfg` to every game folder it finds, resets file permissions to `-rw-r--r--` (fixes old `----------` zips too) and copies everything else byte for byte without recompressing. A `retroarch.cfg` you edited yourself is kept. Zips with no game folders are left alone. Library functions: `zipList`, `repairZip`, `saveFiles` in `src/lib.js`.
 - Tested with desktop unzip on old-style stored and deflated zips (games intact, folders created, repeat repair adds nothing). **Not yet confirmed on real PSP hardware.**
+
+## Fixes (Nov 2026, round 4): saves really persist
+
+Round 3 still lost progress (play, save in-game, quit, relaunch = blank game). Reading the core's startup code showed why: the PSP RetroArch cores hard-code `ms0:/PSP/RETROARCH` as their home and read `retroarch.cfg` only from there, **never from the game folder**. The per-game `retroarch.cfg` from round 3 was ignored, so autosave stayed off and a HOME exit dropped the unsaved in-game save.
+
+- The settings now live in `PSP/RETROARCH/retroarch.cfg` (written by every build and by Repair). `savefiles_in_content_dir` / `savestates_in_content_dir` keep each game's `.srm` and `.state.auto` next to its ROM; `autosave_interval = 10` flushes in-game saves every 10 s; `savestate_auto_save` / `savestate_auto_load` resume where you quit.
+- The Install step and README now say to copy the whole `PSP` folder, since `PSP/RETROARCH` is required.
+- Per-game `retroarch.cfg`, `savefiles/` and `savestates/` are no longer generated (they did nothing). Repair adds only `PSP/RETROARCH`.
+- If you already run real RetroArch on the PSP and have your own `PSP/RETROARCH/retroarch.cfg`, do not overwrite it. Add these lines to it:
+  `savefiles_in_content_dir = "true"`, `savestates_in_content_dir = "true"`, `savestate_auto_save = "true"`, `savestate_auto_load = "true"`, `autosave_interval = "10"`.
+- Not yet confirmed on real PSP hardware. After saving in-game, wait about 10 s before pressing HOME the first time.

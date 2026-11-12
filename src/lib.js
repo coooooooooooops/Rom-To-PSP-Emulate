@@ -79,35 +79,37 @@ function zipList(b){
   return out;
 }
 // ---- Saves -------------------------------------------------------------------------------------------------
-// The RetroArch cores quietly skip saving when their save folders do not exist ("savefile_directory is not a directory"),
-// and nothing used to create them. Every game folder now ships with savefiles/ + savestates/ (and PSP/RETROARCH/ the
-// cores fall back to), plus a retroarch.cfg that keeps saves next to the ROM, flushes them every 10 s and resumes automatically.
+// The RetroArch PSP cores ignore the game folder for settings: they hard-code ms0:/PSP/RETROARCH as their home, read
+// PSP/RETROARCH/retroarch.cfg from there, and look for PSP/RETROARCH/SAVEFILES and SAVESTATES (they log "savefile_directory is
+// not a directory, ignoring" and never save when those are missing). With no config, autosave is off and a HOME exit
+// loses everything. So the settings live in ONE shared PSP/RETROARCH/retroarch.cfg, and savefiles_in_content_dir /
+// savestates_in_content_dir make each game write its .srm and .state.auto next to its ROM, so games stay separate.
 const CFG_MARK='# ROM to PSP save settings';
-const SAVE_CFG=CFG_MARK+' (safe to delete; the game still runs, it just may not keep saves)\n'+
- 'savefiles_in_content_dir = "true"\nsavestates_in_content_dir = "true"\nsavestate_auto_save = "true"\nsavestate_auto_load = "true"\n'+
- 'autosave_interval = "10"\nsavestate_thumbnail_enable = "false"\nconfig_save_on_exit = "false"\n';
-const KEEP={savefiles:'Game saves (.srm) are written here. Do not delete this folder.\n',savestates:'Save states are written here. Do not delete this folder.\n',system:'Cores look for BIOS files here. Do not delete this folder.\n'};
-function saveFiles(base,shared){ // base: 'PSP/GAME/NAME/' (game folder) or, with shared=true, 'PSP/RETROARCH/'
-  const enc=new TextEncoder(), out=shared?[{name:base}]:[{name:base+'retroarch.cfg',data:enc.encode(SAVE_CFG)}];
-  for(const k of shared?['savefiles','savestates','system']:['savefiles','savestates'])out.push({name:base+k+'/'},{name:base+k+'/README.txt',data:enc.encode(KEEP[k])});
+const SAVE_CFG=CFG_MARK+' (the PSP cores only read this file from PSP/RETROARCH; do not move it)\n'+
+ 'savefiles_in_content_dir = \"true\"\nsavestates_in_content_dir = \"true\"\nsavestate_auto_save = \"true\"\nsavestate_auto_load = \"true\"\n'+
+ 'autosave_interval = \"10\"\nsavestate_thumbnail_enable = \"false\"\nconfig_save_on_exit = \"false\"\n';
+const KEEP={savefiles:'Fallback folder for game saves (.srm). Do not delete this folder.\n',savestates:'Fallback folder for save states. Do not delete this folder.\n',system:'Cores look for BIOS files here. Do not delete this folder.\n'};
+function saveFiles(base,shared){ // shared=true: base is 'PSP/RETROARCH/' (config + folders the cores need). A game folder needs nothing extra: its saves go next to the ROM.
+  if(!shared)return [];
+  const enc=new TextEncoder(), out=[{name:base},{name:base+'retroarch.cfg',data:enc.encode(SAVE_CFG)}];
+  for(const k of ['savefiles','savestates','system'])out.push({name:base+k+'/'},{name:base+k+'/README.txt',data:enc.encode(KEEP[k])});
   return out;
 }
-// Repairs a zip made by an older ROM to PSP: adds the missing save folders and retroarch.cfg to every game folder in it and
-// resets file permissions to -rw-r--r--. Everything else is copied untouched (no re-compressing). Returns {entries, games, added, notes}.
+// Repairs a zip made by an older ROM to PSP: adds PSP/RETROARCH/retroarch.cfg and its save folders, and resets file permissions to
+// -rw-r--r--. Everything else is copied untouched (no re-compressing). Returns {entries, games, added, notes}.
 function repairZip(bytes){
   const list=zipList(bytes), have=new Map(list.map(e=>[e.name.toLowerCase(),e])), notes=[], extra=[], bases=[], psp=new Set();
   for(const e of list){
     const m=/^(.*\/)?eboot\.pbp$/i.exec(e.name); if(!m||/(^|\/)__MACOSX\//.test(e.name))continue;
     const base=m[1]||''; if(!have.has((base+'core.pbp').toLowerCase())&&!have.has((base+'launch.txt').toLowerCase()))continue;
-    bases.push(base); const g=/^(.*?\/)?PSP\/GAME\//i.exec(base); if(g)psp.add((g[1]||'')+'PSP/');
+    bases.push(base); const g=/^(.*?\/)?PSP\/GAME\//i.exec(base); psp.add((g&&g[1]||'')+'PSP/');
   }
   const add=(f)=>{if(!have.has(f.name.toLowerCase())){have.set(f.name.toLowerCase(),f);extra.push(f)}};
-  for(const base of bases){
-    const cfg=have.get(base.toLowerCase()+'retroarch.cfg');
-    if(cfg&&cfg.bytes&&new TextDecoder().decode(cfg.bytes).indexOf(CFG_MARK)!==0&&cfg.method===0)notes.push('kept the retroarch.cfg already in '+base);
-    saveFiles(base,false).forEach(add);
+  for(const p of psp){
+    const cfg=have.get((p+'RETROARCH/retroarch.cfg').toLowerCase());
+    if(cfg&&cfg.method===0&&new TextDecoder().decode(cfg.bytes).indexOf(CFG_MARK)!==0)notes.push('kept the retroarch.cfg already in '+p+'RETROARCH (add the lines from the README, "Core fixes round 4", if saves still fail)');
+    saveFiles(p+'RETROARCH/',true).forEach(add);
   }
-  for(const p of psp)saveFiles(p+'RETROARCH/',true).forEach(add);
   const entries=list.map((e)=>({name:e.name,raw:e})).concat(extra);
   return {entries,games:bases.length,added:extra.length,notes};
 }
