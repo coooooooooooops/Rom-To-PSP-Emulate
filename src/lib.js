@@ -38,18 +38,78 @@ function checkPbp(b){
   return true}
 const CT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
 function crc32(b){let c=~0;for(let i=0;i<b.length;i++)c=CT[(c^b[i])&255]^(c>>>8);return ~c>>>0}
-function zipStore(files){ // files: [{name, data:Uint8Array}]
+function zipStore(files){ // files: [{name, data:Uint8Array}] | [{name:'dir/'}] | [{name, raw:{method,crc,csize,usize,bytes}}]
   const d=new Date(), dt=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1))&65535, dd=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate())&65535;
   const enc=new TextEncoder(), parts=[], cen=[]; let off=0;
   for(const f of files){
-    const n=enc.encode(f.name), c=crc32(f.data), L=new Uint8Array([...u32(0x04034b50),20,0,0,8,0,0,...u16(dt),...u16(dd),...u32(c),...u32(f.data.length),...u32(f.data.length),...u16(n.length),0,0]);
-    parts.push(L,n,f.data);
-    cen.push(new Uint8Array([...u32(0x02014b50),20,3,20,0,0,8,0,0,...u16(dt),...u16(dd),...u32(c),...u32(f.data.length),...u32(f.data.length),...u16(n.length),0,0,0,0,0,0,0,0,...u32(0x81A40000),...u32(off)]),n); // external attr = -rw-r--r--
-    off+=L.length+n.length+f.data.length;
+    const n=enc.encode(f.name), isDir=f.name.endsWith('/'); let body,m,c,cs,us;
+    if(f.raw){body=f.raw.bytes;m=f.raw.method;c=f.raw.crc;cs=f.raw.csize;us=f.raw.usize}
+    else{body=isDir?new Uint8Array(0):f.data;m=0;c=isDir?0:crc32(body);cs=us=body.length}
+    const L=new Uint8Array([...u32(0x04034b50),20,0,0,8,...u16(m),...u16(dt),...u16(dd),...u32(c),...u32(cs),...u32(us),...u16(n.length),0,0]);
+    parts.push(L,n,body);
+    // external attr: file = -rw-r--r--, folder = drwxr-xr-x (+ MS-DOS folder bit)
+    cen.push(new Uint8Array([...u32(0x02014b50),20,3,20,0,0,8,...u16(m),...u16(dt),...u16(dd),...u32(c),...u32(cs),...u32(us),...u16(n.length),0,0,0,0,0,0,0,0,...u32(isDir?0x41ED0010:0x81A40000),...u32(off)]),n);
+    off+=L.length+n.length+body.length;
   }
+  if(off>0xFFFFFFF0||files.length>65534)throw new Error('That is more than one zip can hold (4 GB). Build fewer games per zip.');
   let cs=0; cen.forEach(p=>cs+=p.length);
   const end=new Uint8Array([...u32(0x06054b50),0,0,0,0,...u16(files.length),...u16(files.length),...u32(cs),...u32(off),0,0]);
   return new Blob([...parts,...cen,end],{type:'application/zip'});
+}
+// Reads a zip's central directory. Returns [{name, method, crc, csize, usize, bytes}] where bytes are the still-compressed data (no inflating needed).
+function zipList(b){
+  const dv=new DataView(b.buffer,b.byteOffset,b.byteLength); let e=-1;
+  for(let i=b.length-22;i>=Math.max(0,b.length-65557);i--)if(dv.getUint32(i,true)===0x06054b50){e=i;break}
+  if(e<0)throw new Error('this is not a zip file');
+  const n=dv.getUint16(e+10,true), cdOff=dv.getUint32(e+16,true);
+  if(n===0xFFFF||cdOff===0xFFFFFFFF)throw new Error('zip64 zips (over 4 GB) are not supported');
+  const dec=new TextDecoder(), out=[]; let p=cdOff;
+  for(let i=0;i<n;i++){
+    if(p+46>b.length||dv.getUint32(p,true)!==0x02014b50)throw new Error('the zip is damaged (bad file list)');
+    const fl=dv.getUint16(p+8,true), m=dv.getUint16(p+10,true), crc=dv.getUint32(p+16,true), cs=dv.getUint32(p+20,true), us=dv.getUint32(p+24,true),
+      nl=dv.getUint16(p+28,true), xl=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true), lo=dv.getUint32(p+42,true);
+    if(fl&1)throw new Error('password-protected zips are not supported');
+    if(cs===0xFFFFFFFF||us===0xFFFFFFFF||lo===0xFFFFFFFF)throw new Error('zip64 zips (over 4 GB) are not supported');
+    if(dv.getUint32(lo,true)!==0x04034b50)throw new Error('the zip is damaged (bad file header)');
+    const ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true);
+    if(ds+cs>b.length)throw new Error('the zip is damaged or cut short');
+    out.push({name:dec.decode(b.subarray(p+46,p+46+nl)),method:m,crc,csize:cs,usize:us,bytes:b.subarray(ds,ds+cs)});
+    p+=46+nl+xl+cl;
+  }
+  return out;
+}
+// ---- Saves -------------------------------------------------------------------------------------------------
+// The RetroArch cores quietly skip saving when their save folders do not exist ("savefile_directory is not a directory"),
+// and nothing used to create them. Every game folder now ships with savefiles/ + savestates/ (and PSP/RETROARCH/ the
+// cores fall back to), plus a retroarch.cfg that keeps saves next to the ROM, flushes them every 10 s and resumes automatically.
+const CFG_MARK='# ROM to PSP save settings';
+const SAVE_CFG=CFG_MARK+' (safe to delete; the game still runs, it just may not keep saves)\n'+
+ 'savefiles_in_content_dir = "true"\nsavestates_in_content_dir = "true"\nsavestate_auto_save = "true"\nsavestate_auto_load = "true"\n'+
+ 'autosave_interval = "10"\nsavestate_thumbnail_enable = "false"\nconfig_save_on_exit = "false"\n';
+const KEEP={savefiles:'Game saves (.srm) are written here. Do not delete this folder.\n',savestates:'Save states are written here. Do not delete this folder.\n',system:'Cores look for BIOS files here. Do not delete this folder.\n'};
+function saveFiles(base,shared){ // base: 'PSP/GAME/NAME/' (game folder) or, with shared=true, 'PSP/RETROARCH/'
+  const enc=new TextEncoder(), out=shared?[{name:base}]:[{name:base+'retroarch.cfg',data:enc.encode(SAVE_CFG)}];
+  for(const k of shared?['savefiles','savestates','system']:['savefiles','savestates'])out.push({name:base+k+'/'},{name:base+k+'/README.txt',data:enc.encode(KEEP[k])});
+  return out;
+}
+// Repairs a zip made by an older ROM to PSP: adds the missing save folders and retroarch.cfg to every game folder in it and
+// resets file permissions to -rw-r--r--. Everything else is copied untouched (no re-compressing). Returns {entries, games, added, notes}.
+function repairZip(bytes){
+  const list=zipList(bytes), have=new Map(list.map(e=>[e.name.toLowerCase(),e])), notes=[], extra=[], bases=[], psp=new Set();
+  for(const e of list){
+    const m=/^(.*\/)?eboot\.pbp$/i.exec(e.name); if(!m||/(^|\/)__MACOSX\//.test(e.name))continue;
+    const base=m[1]||''; if(!have.has((base+'core.pbp').toLowerCase())&&!have.has((base+'launch.txt').toLowerCase()))continue;
+    bases.push(base); const g=/^(.*?\/)?PSP\/GAME\//i.exec(base); if(g)psp.add((g[1]||'')+'PSP/');
+  }
+  const add=(f)=>{if(!have.has(f.name.toLowerCase())){have.set(f.name.toLowerCase(),f);extra.push(f)}};
+  for(const base of bases){
+    const cfg=have.get(base.toLowerCase()+'retroarch.cfg');
+    if(cfg&&cfg.bytes&&new TextDecoder().decode(cfg.bytes).indexOf(CFG_MARK)!==0&&cfg.method===0)notes.push('kept the retroarch.cfg already in '+base);
+    saveFiles(base,false).forEach(add);
+  }
+  for(const p of psp)saveFiles(p+'RETROARCH/',true).forEach(add);
+  const entries=list.map((e)=>({name:e.name,raw:e})).concat(extra);
+  return {entries,games:bases.length,added:extra.length,notes};
 }
 const SYS={
  gba:{core:'gba',name:'Game Boy Advance',repo:'Nintendo_-_Game_Boy_Advance',hue:265},
@@ -65,4 +125,4 @@ const EXT={gba:'gba',sfc:'snes',smc:'snes',swc:'snes',fig:'snes',nes:'nes',gb:'g
 const NO={z64:'N64',n64:'N64',v64:'N64',iso:'a disc game',cue:'a disc game',chd:'a disc game',cso:'a disc game',gcm:'GameCube',nds:'Nintendo DS',zip:'a zip (unzip it first)','7z':'an archive (unzip it first)',bin:'an unclear .bin (rename it to .md for Genesis or .gba for GBA)'};
 function cleanTitle(fn){return fn.replace(/\.[^.]+$/,'').replace(/\s*[\(\[][^\)\]]*[\)\]]/g,'').replace(/\s*#.*$/,'').replace(/_/g,' ').replace(/\s+/g,' ').trim()||'Game'}
 function slug(s){return s.normalize('NFKD').replace(/[^\x00-\x7f]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,24)||'GAME'}
-if(typeof module!=='undefined')module.exports={sfo,pbp,checkPbp,zipStore,crc32,cleanTitle,slug,EXT,SYS};
+if(typeof module!=='undefined')module.exports={sfo,pbp,checkPbp,zipStore,zipList,repairZip,saveFiles,SAVE_CFG,CFG_MARK,crc32,cleanTitle,slug,EXT,SYS};

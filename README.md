@@ -13,7 +13,7 @@ Everything runs in your browser. ROMs are never uploaded anywhere.
 5. In ARK's settings set **Use extra memory** to **Max**. Large games such as Zelda: The Minish Cap (16 MB GBA) crash to a black screen and power the PSP off without it.
 6. Open **Game > Memory Stick** on the PSP. Press HOME to quit a game.
 
-Saves go to `PSP/RETROARCH` on the stick. Every game gets a unique ROM filename, so saves never overwrite each other.
+Saves are written inside each game's own folder (`savefiles/` for in-game saves, `savestates/` for the automatic resume point), so every game keeps its own progress. Do not delete those folders.
 
 ## Supported systems
 
@@ -40,7 +40,11 @@ PSP/GAME/SONIC_THE_HEDGEHOG_2/
   CORE.PBP             the libretro core for that system
   kernel_functions.prx RetroArch helper module that lets the launcher start another executable
   launch.txt           two lines: core file name, ROM file name
+  retroarch.cfg        keeps saves next to the ROM, autosaves, resumes where you stopped
+  savefiles/           in-game saves (.srm)
+  savestates/          automatic save state (.state.auto)
   SONIC_THE_HEDGEHOG_2.md
+PSP/RETROARCH/         savefiles/ savestates/ system/ (the folders the cores fall back to)
 ```
 
 The launcher reads `launch.txt`, loads `kernel_functions.prx`, and calls `exitspawn_kernel` with the core as the target and the ROM path as its second argument. That is the same argument layout RetroArch's own Salamander launcher uses, and a RetroArch PSP core treats `argv[1]` as the content to load.
@@ -112,3 +116,11 @@ Verified in PPSSPP: NES, GBA, GB, GBC, SNES, Mega Drive, Master System, Game Gea
 - New `SND0.AT3` support (see Sound). Not verified on real hardware.
 
 - **Extra memory.** Minish Cap boots in PPSSPP in 2000/3000 mode but crashes in PSP-1000 mode, and on a real PSP-3000 with ARK 5 it needed **Use extra memory = Max**. The page and README now say so.
+
+## Fixes (Nov 2026, round 3): saves
+
+- **Saves and save states were never written; every launch started a fresh game.** The RetroArch cores skip saving when their save folder does not exist (they log `"savefile_directory" is not a directory, ignoring`), and the generated folders never created one. Every game folder now ships with `savefiles/` and `savestates/` (plus `PSP/RETROARCH/savefiles|savestates|system`, which the cores fall back to) and a `retroarch.cfg` that sets:
+  `savefiles_in_content_dir` and `savestates_in_content_dir` (saves live next to the ROM), `savestate_auto_save` and `savestate_auto_load` (resume exactly where you quit), `autosave_interval = 10` (in-game saves are flushed every 10 s, so quitting with HOME cannot lose them).
+  To start a game from scratch, delete `savestates/<game>.state.auto` (and `savefiles/<game>.srm` to wipe the in-game save).
+- **Repair zips you already built.** New section on the page: drop one or many old `PSP_Games.zip` files and download fixed copies. It adds the save folders and `retroarch.cfg` to every game folder it finds, resets file permissions to `-rw-r--r--` (fixes old `----------` zips too) and copies everything else byte for byte without recompressing. A `retroarch.cfg` you edited yourself is kept. Zips with no game folders are left alone. Library functions: `zipList`, `repairZip`, `saveFiles` in `src/lib.js`.
+- Tested with desktop unzip on old-style stored and deflated zips (games intact, folders created, repeat repair adds nothing). **Not yet confirmed on real PSP hardware.**

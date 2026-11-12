@@ -35,7 +35,27 @@ button:hover,.lbl:hover{border-color:var(--acc)}button:focus-visible,.lbl:focus-
 ol.steps{padding-left:22px}ol.steps li{margin:8px 0;max-width:68ch}
 .note{color:var(--mut);font-size:.92rem;max-width:68ch}
 @media(max-width:640px){.game{grid-template-columns:1fr}.prev{justify-content:center}.btns{flex-direction:row}}
-</style></head><body><main>
+
+:root,:root:not([data-theme="light"]),:root[data-theme="dark"]{--bg:#0a4fc4;--bg2:#1fa8e6;--ink:#fff;--mut:#d3e4ff;--card:#ffffff22;--line:#ffffff55;--acc:#fff;--onacc:#0a3a8f;--ok:#a8ffd3;--bad:#ffc2bd;color-scheme:dark}
+body{background:#0a3a9f}#wave{position:fixed;inset:0;width:100%;height:100%;z-index:-1;display:block}
+.top{position:fixed;top:0;right:0;z-index:5;display:flex;gap:10px;align-items:center;padding:calc(10px + env(safe-area-inset-top,0px)) 18px 0;font:600 1.05rem Sora,sans-serif;text-shadow:0 1px 6px #0007}
+.xmb{position:relative;height:138px;margin-top:calc(34px + env(safe-area-inset-top,0px));-webkit-mask:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);mask:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent)}
+.track{position:absolute;left:50%;top:0;display:flex;transform:translateX(calc(-55px - var(--i,0)*110px));transition:transform .55s cubic-bezier(.2,.85,.2,1)}
+.xmb .xi{width:110px;height:130px;padding:14px 0 0;border:0;background:none;color:#fff;display:flex;flex-direction:column;align-items:center;gap:10px;opacity:.5;transition:opacity .4s,transform .4s;cursor:pointer;font:600 1rem Sora,sans-serif;text-shadow:0 1px 8px #0008}
+.xmb .xi:hover{opacity:.85}.xmb .xi svg{width:52px;height:52px;transition:transform .5s cubic-bezier(.2,.85,.2,1),filter .4s;filter:drop-shadow(0 2px 4px #0005)}
+.xmb .xi span{opacity:0;transform:translateY(-6px);transition:opacity .4s,transform .4s}
+.xmb .xi[aria-selected=true]{opacity:1}.xmb .xi[aria-selected=true] svg{transform:scale(1.3) translateY(2px);filter:drop-shadow(0 0 10px #fffa)}.xmb .xi[aria-selected=true] span{opacity:1;transform:none}
+main{padding-top:6px}.panel{animation:rise .55s cubic-bezier(.2,.85,.2,1) both}
+.xhead{border-bottom:2px solid #fff;margin:0 0 22px;padding:0 0 6px;display:flex;flex-wrap:wrap;gap:2px 14px;align-items:baseline;text-shadow:0 1px 8px #0006}.xhead b{font:600 1.5rem Sora,sans-serif}.xhead span{color:var(--mut);font-size:.95rem}
+.panel h1{font-size:clamp(1.5rem,4.2vw,2.2rem)}.panel a{color:#fff}
+.game,#done,#drop,#fixdrop,.sys li{backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}.game{animation:rise .45s cubic-bezier(.2,.85,.2,1) both}
+button,.lbl{transition:background .2s,border-color .2s,transform .2s;border-radius:99px}button:hover,.lbl:hover{background:#ffffff2e;transform:translateY(-1px)}#go,#go:hover{background:#fff;color:#0a3a8f;transform:none;box-shadow:0 6px 24px #0a2a7a66}
+.game input[type=text]{border-radius:99px}.game .prev canvas{box-shadow:0 4px 14px #0006}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body><canvas id="wave" aria-hidden="true"></canvas><main><div class="top" aria-hidden="true"><span id="clock"></span><svg viewBox="0 0 34 16" width="34" height="16"><rect x="1" y="1" width="28" height="14" rx="3" fill="none" stroke="#fff" stroke-width="2"/><rect x="30" y="5" width="3" height="6" rx="1" fill="#fff"/><rect x="4" y="4" width="4" height="8" fill="#fff"/><rect x="10" y="4" width="4" height="8" fill="#fff"/><rect x="16" y="4" width="4" height="8" fill="#fff"/><rect x="22" y="4" width="4" height="8" fill="#fff"/></svg></div>
+<nav class="xmb" aria-label="Sections"><div class="track" role="tablist"><button class="xi" role="tab" data-i="0" aria-selected="true"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M18 20h28c6 0 10 6 12 18 1 7-2 12-7 12-4 0-6-3-9-7H22c-3 4-5 7-9 7-5 0-8-5-7-12 2-12 6-18 12-18z"/><path d="M21 29v9M16.5 33.5h9" stroke="#1a56c8" stroke-width="3" stroke-linecap="round"/><circle cx="42" cy="30" r="2.4" fill="#1a56c8"/><circle cx="47" cy="35" r="2.4" fill="#1a56c8"/></svg><span>Build</span></button><button class="xi" role="tab" data-i="1" aria-selected="false"><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="24" width="48" height="29" rx="5" fill="#fff"/><path d="M24 24v-5a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v5" fill="none" stroke="#fff" stroke-width="4"/><rect x="8" y="36" width="48" height="4" fill="#1a56c8" opacity=".45"/><rect x="28" y="33" width="8" height="10" rx="2" fill="#1a56c8" opacity=".7"/></svg><span>Repair</span></button><button class="xi" role="tab" data-i="2" aria-selected="false"><svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#fff" d="M14 12h28l10 10v30a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V16a4 4 0 0 1 4-4z"/><rect x="18" y="16" width="18" height="7" rx="1.5" fill="#1a56c8" opacity=".5"/></svg><span>Install</span></button></div></nav>
+<section class="panel" id="p0"><div class="xhead"><b>Build</b><span>Turn ROMs into PSP apps</span></div>
 <h1>Drop a ROM.<br>Get a PSP icon.</h1>
 <p class="lead">Each game becomes its own app on the PSP Memory Stick menu, with its own icon, background picture and menu sound, and starts straight into the game. No RetroArch menus.</p>
 <label id="drop" tabindex="-1"><input id="file" type="file" multiple hidden accept=".gba,.sfc,.smc,.swc,.fig,.nes,.gb,.gbc,.md,.gen,.smd,.sms,.gg,.pce,.bin,.zip,.z64,.n64,.v64,.iso,.cue,.chd"><b>Drop ROMs here or click to choose</b><span>Several at once is fine. Files never leave your device.</span></label>
@@ -44,18 +64,24 @@ ol.steps{padding-left:22px}ol.steps li{margin:8px 0;max-width:68ch}
 <div id="list"></div>
 <button id="go">Build my PSP folders</button>
 <div id="done"></div>
-<h2>Put them on the PSP</h2>
-<ol class="steps">
+</section>
+<section class="panel" id="p1" hidden><div class="xhead"><b>Repair</b><span>Fix zips you already built</span></div><p class="note">Saves not sticking, so the game starts fresh every time? Older zips lack the save folders the PSP needs. Drop one or many old <b>PSP_Games.zip</b> files here and get fixed copies back. Your games, art and sound are copied as they are; nothing is rebuilt or uploaded.</p>
+<label id="fixdrop" class="lbl" style="display:block;padding:18px;border-style:dashed"><input id="fixfile" type="file" accept=".zip,application/zip" multiple hidden><b>Drop zips here or click to choose</b></label>
+<div id="fixlist"></div>
+<button id="fixall" style="display:none;margin-top:10px">Download all fixed zips</button>
+</section>
+<section class="panel" id="p2" hidden><div class="xhead"><b>Install</b><span>Put the games on the Memory Stick</span></div><ol class="steps">
 <li>Connect the PSP to your computer. On the PSP choose Settings, USB Connection, or take the Memory Stick out and use a card reader.</li>
 <li>Unzip the download. Copy the <b>GAME</b> folder contents (the game folders) into <b>PSP/GAME</b> on the Memory Stick. If it asks, merge.</li>
 <li>Unplug, then open Game, Memory Stick on the XMB. Each game has its own icon and background, and its sound plays while it is highlighted.</li>
 <li>Start with one game to check it works before copying lots. If something is missing, the PSP shows which file it could not find.</li>
 <li><b>Big games (GBA, SNES, Mega Drive and anything over a few MB):</b> in ARK's settings, set <b>Use extra memory</b> to <b>Max</b>. Without it the PSP can show a black screen and switch itself off when the game starts. Zelda: The Minish Cap (16 MB) needs this.</li>
-<li>Press HOME to quit back to the XMB. Saves are written to <b>PSP/RETROARCH</b> on the stick, and every game gets its own file.</li>
+<li>Press HOME to quit back to the XMB. Game saves and an automatic resume point are written inside each game's own folder (<b>savefiles</b> and <b>savestates</b>), so every game keeps its own progress. Do not delete those folders. If you copy the build over an older copy of a game, choose <b>merge</b> and keep the existing saves.</li>
 </ol>
 <p class="note"><b>Memory tip:</b> if a game goes black and the PSP powers off, set ARK&#39;s <b>Use extra memory</b> to <b>Max</b> and try again. PSP-2000 and 3000 only.</p>
 <p class="note">Needs a PSP running custom firmware such as ARK. Only systems that run well on a PSP-3000 are accepted: N64, PS2, GameCube, Dreamcast and Saturn are too heavy, and PS1 games are better run with the PSP's built-in PS1 support.</p>
 <p class="note" id="artnote"></p>
+</section>
 </main>
 <script>
 /*LIB*/
@@ -145,11 +171,39 @@ $('#go').onclick=async()=>{const btn=$('#go');btn.disabled=true;say('');const fi
    let snd=g.at3||null;if(!snd&&g.pcm){btn.textContent='Encoding sound'+tag+'…';await new Promise((r)=>setTimeout(r,30));snd=encodeSnd(g)}
    const eba=new Uint8Array(await pbp(sfo(g.title),await png(g.ic),await png(g.pc),psp,snd).arrayBuffer());checkPbp(eba);
    files.push({name:base+'EBOOT.PBP',data:eba},{name:base+'CORE.PBP',data:core},{name:base+'kernel_functions.prx',data:prx},
-    {name:base+'launch.txt',data:new TextEncoder().encode('CORE.PBP\n'+romName+'\n')},{name:base+romName,data:new Uint8Array(await g.f.arrayBuffer())})}
+    {name:base+'launch.txt',data:new TextEncoder().encode('CORE.PBP\n'+romName+'\n')},{name:base+romName,data:new Uint8Array(await g.f.arrayBuffer())},...saveFiles(base,false))}
+  files.push(...saveFiles('PSP/RETROARCH/',true));
   const url=URL.createObjectURL(zipStore(files));
   $('#done').style.display='block';$('#done').innerHTML='<b>Done: '+games.length+' game'+(games.length>1?'s':'')+' ready.</b> <a download="PSP_Games.zip" href="'+url+'">Download PSP_Games.zip</a><br>Then follow the steps below.';
   const a=document.createElement('a');a.href=url;a.download='PSP_Games.zip';a.click();
  }catch(e){say('Build failed: '+e.message)}
  btn.disabled=false;btn.textContent='Build my PSP folders'};
+const fixed=[];
+async function fixZips(fl){const list=$('#fixlist');
+ for(const f of [...fl]){const row=document.createElement('div');row.className='game';row.style.gridTemplateColumns='1fr';row.textContent=f.name+': working…';list.append(row);
+  try{await new Promise((r)=>setTimeout(r,20));const r=repairZip(new Uint8Array(await f.arrayBuffer()));
+   if(!r.games){row.innerHTML='';row.append(f.name+': no game folders found in this zip (a game folder has EBOOT.PBP and CORE.PBP). Left alone.');continue}
+   const out=f.name.replace(/\.zip$/i,'')+'-fixed.zip',url=URL.createObjectURL(zipStore(r.entries));
+   row.innerHTML='';const b=document.createElement('b');b.textContent=f.name;row.append(b,' → ',r.games+' game'+(r.games>1?'s':'')+' checked, '+(r.added?r.added+' save file'+(r.added>1?'s':'')+' added. ':'already had working save folders. ')+(r.notes.length?r.notes.join('; ')+'. ':''));
+   const a=document.createElement('a');a.href=url;a.download=out;a.textContent='Download '+out;a.style.cssText='color:var(--acc);font-weight:700';row.append(a);fixed.push(a);$('#fixall').style.display='inline-block'}
+  catch(e){row.textContent=f.name+': '+(e&&e.message||e)}}}
+$('#fixfile').onchange=(e)=>{fixZips(e.target.files);e.target.value=''};
+const fz=$('#fixdrop');fz.ondragover=(e)=>{e.preventDefault();fz.classList.add('over')};fz.ondragleave=()=>fz.classList.remove('over');fz.ondrop=(e)=>{e.preventDefault();fz.classList.remove('over');fixZips(e.dataTransfer.files)};
+$('#fixall').onclick=async()=>{for(const a of fixed){a.click();await new Promise((r)=>setTimeout(r,600))}};
+function tab(i){document.querySelector('.track').style.setProperty('--i',i);document.querySelectorAll('.xi').forEach((b,k)=>b.setAttribute('aria-selected',k===i));
+ document.querySelectorAll('.panel').forEach((p,k)=>{p.hidden=k!==i})}
+document.querySelectorAll('.xi').forEach((b)=>b.onclick=()=>tab(+b.dataset.i));
+addEventListener('keydown',(e)=>{if(/INPUT|TEXTAREA/.test(document.activeElement.tagName)||e.altKey||e.ctrlKey||e.metaKey)return;
+ const cur=[...document.querySelectorAll('.xi')].findIndex(b=>b.getAttribute('aria-selected')==='true');if(e.key==='ArrowRight')tab(Math.min(2,cur+1));if(e.key==='ArrowLeft')tab(Math.max(0,cur-1))});
+const clk=()=>{const d=new Date();$('#clock').textContent=(d.getMonth()+1)+'/'+d.getDate()+' '+((d.getHours()+11)%12+1)+':'+String(d.getMinutes()).padStart(2,'0')+(d.getHours()<12?'AM':'PM')};clk();setInterval(clk,15000);
+(()=>{const c=$('#wave'),x=c.getContext('2d'),still=matchMedia('(prefers-reduced-motion:reduce)').matches;let w,h;
+ const fit=()=>{w=c.width=Math.ceil(innerWidth/2);h=c.height=Math.ceil(innerHeight/2)};fit();addEventListener('resize',fit);
+ const W=[[.52,.9,.55,24,.0045],[.60,1.3,.4,30,.0035],[.70,.7,.7,36,.003],[.80,1.1,.5,28,.004]];
+ function draw(t){const g=x.createLinearGradient(0,0,w*.3,h);g.addColorStop(0,'#04186b');g.addColorStop(.45,'#0b55cf');g.addColorStop(1,'#25bdf0');x.fillStyle=g;x.fillRect(0,0,w,h);
+  W.forEach((q,k)=>{const base=h*q[0],A=q[3]*h/500;x.beginPath();x.moveTo(0,h);
+   for(let px=0;px<=w+8;px+=8){const y=base+Math.sin(px*q[4]*2+t*q[1]*.0006+k*1.7)*A+Math.sin(px*q[4]*4.2-t*q[2]*.0005+k)*A*.45;x.lineTo(px,y)}
+   x.lineTo(w,h);x.closePath();const f=x.createLinearGradient(0,base-A,0,h);f.addColorStop(0,'rgba(255,255,255,'+(.2-k*.03)+')');f.addColorStop(1,'rgba(255,255,255,.015)');x.fillStyle=f;x.fill();
+   x.lineWidth=1.5;x.strokeStyle='rgba(255,255,255,'+(.38-k*.06)+')';x.stroke()})}
+ const loop=(t)=>{draw(t);requestAnimationFrame(loop)};still?draw(4000):requestAnimationFrame(loop)})();
 if(location.protocol==='https:'||1)setTimeout(()=>{if(games.length&&!games.some(g=>g.real))$('#artnote').textContent='Box art lookup needs internet access to GitHub. Games without it get a generated title card; use Own picture to set your own.'},0);
 </script></body></html>

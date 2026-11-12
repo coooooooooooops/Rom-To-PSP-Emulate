@@ -23,6 +23,22 @@ const assert = require("assert"), L = require("../src/lib.js");
   const z = Buffer.from(await L.zipStore([{ name: "a/b.txt", data: new Uint8Array([1, 2, 3]) }]).arrayBuffer());
   const cd = z.indexOf(Buffer.from([0x50, 0x4b, 1, 2]));
   assert.strictEqual(z.readUInt32LE(cd + 38) >>> 16, 0o100644);
+  // zip reader round trip + folder entries
+  const enc = new TextEncoder(), dec = new TextDecoder();
+  const zz = Buffer.from(await L.zipStore([{ name: "d/" }, { name: "d/a.txt", data: enc.encode("hello") }]).arrayBuffer());
+  const zl = L.zipList(new Uint8Array(zz)); assert.deepStrictEqual(zl.map((e) => e.name), ["d/", "d/a.txt"]);
+  assert.strictEqual(dec.decode(zl[1].bytes), "hello"); assert.strictEqual(zl[1].crc, L.crc32(enc.encode("hello")));
+  const cd0 = zz.indexOf(Buffer.from([0x50, 0x4b, 1, 2])); assert.strictEqual(zz.readUInt32LE(cd0 + 38), 0x41ED0010);
+  // repair: an old-style game folder gains save folders, retroarch.cfg and PSP/RETROARCH; a second pass changes nothing
+  const old = Buffer.from(await L.zipStore(["EBOOT.PBP", "CORE.PBP", "launch.txt", "G.gba"].map((n) => ({ name: "PSP/GAME/G/" + n, data: enc.encode(n) }))).arrayBuffer());
+  const r1 = L.repairZip(new Uint8Array(old)); assert.strictEqual(r1.games, 1);
+  const names = r1.entries.map((e) => e.name);
+  for (const n of ["PSP/GAME/G/retroarch.cfg", "PSP/GAME/G/savefiles/", "PSP/GAME/G/savestates/", "PSP/GAME/G/savefiles/README.txt", "PSP/RETROARCH/savefiles/", "PSP/RETROARCH/savestates/", "PSP/RETROARCH/system/"]) assert.ok(names.includes(n), "missing " + n);
+  const fixedZip = Buffer.from(await L.zipStore(r1.entries).arrayBuffer());
+  const r2 = L.repairZip(new Uint8Array(fixedZip)); assert.strictEqual(r2.added, 0); assert.strictEqual(r2.entries.length, r1.entries.length);
+  const cfgE = L.zipList(new Uint8Array(fixedZip)).find((e) => e.name.endsWith("retroarch.cfg")); assert.ok(dec.decode(cfgE.bytes).startsWith(L.CFG_MARK));
+  assert.strictEqual(L.repairZip(new Uint8Array(await L.zipStore([{ name: "x.txt", data: enc.encode("x") }]).arrayBuffer())).games, 0);
+  assert.throws(() => L.zipList(new Uint8Array(10)), /not a zip/);
   // AT3 encoder: header and frame layout
   const A = require("../src/at3.js"), n = 44100, l = new Float32Array(n).map((_, i) => 0.3 * Math.sin(i * 0.06));
   const at3 = Buffer.from(A.encode(l, l));
